@@ -87,17 +87,35 @@ P.S. You can delete this when you're done too. It's your config now! :)
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
+if vim.g.vscode then
+  vim.keymap.set('n', '<Space>', '', { noremap = true, silent = true })
+else
+  vim.o.guifont = 'CaskaydiaCove Nerd Font Mono:h16'
+end
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
-
+if vim.g.vscode then
+  local vscode = require 'vscode'
+  vim.keymap.set({ 'n', 'x' }, '<leader>f', function()
+    vscode.action 'editor.action.formatDocument'
+  end, { noremap = true, silent = true })
+  vim.keymap.set({ 'n', 'x' }, '<leader>r', function()
+    vscode.with_insert(function()
+      vscode.action 'editor.action.refactor'
+    end)
+  end, { noremap = true, silent = true })
+end
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
 -- NOTE: You can change these options as you wish!
 --  For more options, you can see `:help option-list`
 
+vim.opt.expandtab = true
+vim.opt.tabstop = 2
+vim.opt.shiftwidth = 2
 -- Make line numbers default
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
@@ -273,6 +291,7 @@ require('lazy').setup({
   -- See `:help gitsigns` to understand what the configuration keys do
   { -- Adds git related signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
+    cond = not vim.g.vscode,
     opts = {
       signs = {
         add = { text = '+' },
@@ -300,6 +319,7 @@ require('lazy').setup({
 
   { -- Useful plugin to show you pending keybinds.
     'folke/which-key.nvim',
+    cond = not vim.g.vscode,
     event = 'VimEnter', -- Sets the loading event to 'VimEnter'
     opts = {
       -- delay between pressing a key and opening which-key (milliseconds)
@@ -360,6 +380,7 @@ require('lazy').setup({
 
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
+    cond = not vim.g.vscode,
     event = 'VimEnter',
     dependencies = {
       'nvim-lua/plenary.nvim',
@@ -467,23 +488,30 @@ require('lazy').setup({
     -- `lazydev` configures Lua LSP for your Neovim config, runtime and plugins
     -- used for completion, annotations and signatures of Neovim apis
     'folke/lazydev.nvim',
+    cond = not vim.g.vscode,
     ft = 'lua',
     opts = {
       library = {
         -- Load luvit types when the `vim.uv` word is found
         { path = '${3rd}/luv/library', words = { 'vim%.uv' } },
+        'nvim-dap-ui',
       },
     },
   },
   {
     -- Main LSP Configuration
     'neovim/nvim-lspconfig',
+    cond = not vim.g.vscode,
     dependencies = {
       -- Automatically install LSPs and related tools to stdpath for Neovim
       -- Mason must be loaded before its dependents so we need to set it up here.
       -- NOTE: `opts = {}` is the same as calling `require('mason').setup({})`
-      { 'mason-org/mason.nvim', opts = {} },
-      'mason-org/mason-lspconfig.nvim',
+      -- { 'mason-org/mason.nvim', opts = {} },
+      -- 'mason-org/mason-lspconfig.nvim',
+      { 'williamboman/mason.nvim', opts = {
+        PATH = 'append',
+      } },
+      'williamboman/mason-lspconfig.nvim',
       'WhoIsSethDaniel/mason-tool-installer.nvim',
 
       -- Useful status updates for LSP.
@@ -674,7 +702,19 @@ require('lazy').setup({
         -- clangd = {},
         -- gopls = {},
         -- pyright = {},
-        -- rust_analyzer = {},
+        rust_analyzer = {
+          on_attach = function(client, bufnr)
+            vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+          end,
+          settings = {
+            diagnostics = {
+              disabled = {
+                'inactive-code',
+              },
+              enable = false,
+            },
+          },
+        },
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -695,6 +735,9 @@ require('lazy').setup({
               },
               -- You can toggle below to ignore Lua_LS's noisy `missing-fields` warnings
               -- diagnostics = { disable = { 'missing-fields' } },
+              diagnostics = {
+                globals = { 'vim' },
+              },
             },
           },
         },
@@ -733,11 +776,21 @@ require('lazy').setup({
           end,
         },
       }
+      vim.lsp.config('sourcekit', {
+        capabilities = {
+          workspace = {
+            didChangeWatchedFiles = {
+              dynamicRegistration = true,
+            },
+          },
+        },
+      })
     end,
   },
 
   { -- Autoformat
     'stevearc/conform.nvim',
+    cond = not vim.g.vscode,
     event = { 'BufWritePre' },
     cmd = { 'ConformInfo' },
     keys = {
@@ -776,9 +829,18 @@ require('lazy').setup({
       },
     },
   },
-
+  {
+    'saghen/blink.compat',
+    -- use the latest release, via version = '*', if you also use the latest release for blink.cmp
+    version = '*',
+    -- lazy.nvim will automatically load the plugin when it's required by blink.cmp
+    lazy = true,
+    -- make sure to set opts so that lazy.nvim calls blink.compat's setup
+    opts = {},
+  },
   { -- Autocompletion
     'saghen/blink.cmp',
+    cond = not vim.g.vscode,
     event = 'VimEnter',
     version = '1.*',
     dependencies = {
@@ -799,15 +861,16 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    See the README about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_vscode').lazy_load()
+            end,
+          },
         },
         opts = {},
       },
+      'PaterJason/cmp-conjure',
       'folke/lazydev.nvim',
     },
     --- @module 'blink.cmp'
@@ -835,7 +898,8 @@ require('lazy').setup({
         -- <c-k>: Toggle signature help
         --
         -- See :h blink-cmp-config-keymap for defining your own keymap
-        preset = 'default',
+        preset = 'super-tab',
+        ['<CR>'] = { 'accept', 'fallback' },
 
         -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
         --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
@@ -851,12 +915,19 @@ require('lazy').setup({
         -- By default, you may press `<c-space>` to show the documentation.
         -- Optionally, set `auto_show = true` to show the documentation after a delay.
         documentation = { auto_show = false, auto_show_delay_ms = 500 },
+        trigger = { show_in_snippet = false },
+        -- list = { selection = { preselect = false } },
       },
 
       sources = {
         default = { 'lsp', 'path', 'snippets', 'lazydev' },
         providers = {
           lazydev = { module = 'lazydev.integrations.blink', score_offset = 100 },
+          conjure = {
+            -- IMPORTANT: use the same name as you would for nvim-cmp
+            name = 'conjure',
+            module = 'blink.compat.source',
+          },
         },
       },
 
@@ -869,11 +940,71 @@ require('lazy').setup({
       -- the rust implementation via `'prefer_rust_with_warning'`
       --
       -- See :h blink-cmp-config-fuzzy for more information
-      fuzzy = { implementation = 'lua' },
+      fuzzy = { implementation = 'prefer_rust_with_warning' },
 
       -- Shows a signature help window while you type arguments for a function
       signature = { enabled = true },
     },
+  },
+  {
+    'Olical/conjure',
+    cond = not vim.g.vscode,
+    ft = { 'scheme' }, -- etc
+    lazy = true,
+    init = function()
+      -- Set configuration options here
+      -- Uncomment this to get verbose logging to help diagnose internal Conjure issues
+      -- This is VERY helpful when reporting an issue with the project
+      vim.g['conjure#debug'] = true
+      vim.g['conjure#filetypes'] = { 'scheme' }
+    end,
+
+    -- Optional cmp-conjure integration
+    dependencies = { 'PaterJason/cmp-conjure' },
+  },
+  {
+    'PaterJason/cmp-conjure',
+    cond = not vim.g.vscode,
+    lazy = true,
+  },
+  {
+    'thesimonho/kanagawa-paper.nvim',
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
+  {
+    'rebelot/kanagawa.nvim',
+    lazy = false,
+    priority = 1000,
+    opts = {},
+    config = function()
+      require('kanagawa').setup {
+        compile = false, -- enable compiling the colorscheme
+        undercurl = true, -- enable undercurls
+        commentStyle = { italic = true },
+        functionStyle = {},
+        keywordStyle = { italic = true },
+        statementStyle = { bold = true },
+        typeStyle = {},
+        transparent = false, -- do not set background color
+        dimInactive = false, -- dim inactive window `:h hl-NormalNC`
+        terminalColors = true, -- define vim.g.terminal_color_{0,17}
+        colors = { -- add/modify theme and palette colors
+          palette = {},
+          theme = { wave = {}, lotus = {}, dragon = {}, all = {} },
+        },
+        overrides = function(colors) -- add/modify highlights
+          return {}
+        end,
+        theme = 'wave', -- Load "wave" theme
+        background = { -- map the value of 'background' option to a theme
+          dark = 'wave', -- try "dragon" !
+          light = 'lotus',
+        },
+      }
+      vim.cmd.colorscheme 'kanagawa'
+    end,
   },
 
   { -- You can easily change to a different colorscheme.
@@ -894,13 +1025,127 @@ require('lazy').setup({
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'tokyonight-night'
+      -- vim.cmd.colorscheme 'tokyonight-night'
     end,
   },
 
   -- Highlight todo, notes, etc in comments
   { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
-
+  {
+    'stevearc/overseer.nvim',
+    cond = not vim.g.vscode,
+    opts = {},
+  },
+  {
+    'Civitasv/cmake-tools.nvim',
+    cond = not vim.g.vscode,
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    opts = {},
+    config = function()
+      local osys = require 'cmake-tools.osys'
+      require('cmake-tools').setup {
+        cmake_kits_path = '~/.local/share/CMakeTools/cmake-tools-kits.json',
+      }
+    end,
+  },
+  {
+    'mfussenegger/nvim-dap',
+    config = function()
+      vim.keymap.set('n', '<F5>', function()
+        require('dap').continue()
+      end, { desc = 'continue' })
+      vim.keymap.set('n', '<F10>', function()
+        require('dap').step_over()
+      end)
+      vim.keymap.set('n', '<F11>', function()
+        require('dap').step_into()
+      end)
+      vim.keymap.set('n', '<F12>', function()
+        require('dap').step_out()
+      end)
+      vim.keymap.set('n', '<Leader>b', function()
+        require('dap').toggle_breakpoint()
+      end, { desc = 'Toggle breakpoint' })
+      vim.keymap.set('n', '<Leader>B', function()
+        require('dap').set_breakpoint()
+      end, { desc = 'Set breakpoint' })
+      vim.keymap.set('n', '<Leader>lp', function()
+        require('dap').set_breakpoint(nil, nil, vim.fn.input 'Log point message: ')
+      end, { desc = 'Set breakpoint with message:' })
+      vim.keymap.set('n', '<Leader>dr', function()
+        require('dap').repl.open()
+      end, { desc = 'Open repl' })
+      vim.keymap.set('n', '<Leader>dl', function()
+        require('dap').run_last()
+      end, { desc = 'Run Last' })
+      vim.keymap.set({ 'n', 'v' }, '<Leader>dh', function()
+        require('dap.ui.widgets').hover()
+      end, { desc = 'Hover' })
+      vim.keymap.set({ 'n', 'v' }, '<Leader>dp', function()
+        require('dap.ui.widgets').preview()
+      end, { desc = 'Preview' })
+      vim.keymap.set('n', '<Leader>df', function()
+        local widgets = require 'dap.ui.widgets'
+        widgets.centered_float(widgets.frames)
+      end, { desc = 'Float frames' })
+      vim.keymap.set('n', '<Leader>ds', function()
+        local widgets = require 'dap.ui.widgets'
+        widgets.centered_float(widgets.scopes)
+      end, { desc = 'Float scopes' })
+    end,
+  },
+  { 'theHamsta/nvim-dap-virtual-text', opts = {} },
+  {
+    'rcarriga/nvim-dap-ui',
+    dependencies = {
+      'mfussenegger/nvim-dap',
+      'nvim-neotest/nvim-nio',
+    },
+    config = function()
+      local dap, dapui = require 'dap', require 'dapui'
+      dapui.setup()
+      dap.listeners.before.attach.dapui_config = function()
+        dapui.open()
+      end
+      dap.listeners.before.launch.dapui_config = function()
+        dapui.open()
+      end
+      dap.listeners.before.event_terminated.dapui_config = function()
+        dapui.close()
+      end
+      dap.listeners.before.event_exited.dapui_config = function()
+        dapui.close()
+      end
+    end,
+  },
+  {
+    'jay-babu/mason-nvim-dap.nvim',
+    cond = not vim.g.vscode,
+    ---@type MasonNvimDapSettings
+    opts = {
+      -- This line is essential to making automatic installation work
+      -- :exploding-brain
+      handlers = {},
+      automatic_installation = {
+        -- These will be configured by separate plugins.
+        exclude = {
+          'delve',
+          'python',
+        },
+      },
+      -- DAP servers: Mason will be invoked to install these if necessary.
+      ensure_installed = {
+        'bash',
+        'codelldb',
+        'php',
+        'python',
+      },
+    },
+    dependencies = {
+      'mfussenegger/nvim-dap',
+      'williamboman/mason.nvim',
+    },
+  },
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
     config = function()
@@ -940,11 +1185,30 @@ require('lazy').setup({
   },
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
+    cond = not vim.g.vscode,
     build = ':TSUpdate',
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = {
+        'bash',
+        'c',
+        'diff',
+        'html',
+        'lua',
+        'luadoc',
+        'markdown',
+        'markdown_inline',
+        'query',
+        'vim',
+        'vimdoc',
+        'cpp',
+        'rust',
+        'go',
+        'typescript',
+        'javascript',
+        'fish',
+      },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -976,9 +1240,9 @@ require('lazy').setup({
   -- require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
@@ -1011,6 +1275,14 @@ require('lazy').setup({
     },
   },
 })
+
+-- Enable true color support if your terminal supports it
+vim.opt.termguicolors = true
+
+-- Change cursor color to green (hex: #00FF00)
+vim.cmd [[highlight Cursor guifg=#FFFF00 guibg=#00FFFF]]
+-- For terminal (TUI) with 256 colors
+vim.cmd [[highlight Cursor ctermfg=red ctermbg=red]]
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et

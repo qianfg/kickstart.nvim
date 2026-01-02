@@ -3,6 +3,7 @@
 
 return {
   'nvim-neo-tree/neo-tree.nvim',
+  cond = not vim.g.vscode,
   version = '*',
   dependencies = {
     'nvim-lua/plenary.nvim',
@@ -13,8 +14,10 @@ return {
   keys = {
     { '\\', ':Neotree reveal<CR>', desc = 'NeoTree reveal', silent = true },
   },
+  lazy = false,
   opts = {
     filesystem = {
+      hijack_netrw_behavior = 'open_default',
       window = {
         mappings = {
           ['\\'] = 'close_window',
