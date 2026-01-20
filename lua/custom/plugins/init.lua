@@ -3,8 +3,17 @@
 --
 -- See the kickstart.nvim README for more information
 return {
+  -- {
+  --   'voldikss/vim-floaterm',
+  --   cmd = 'FloatermToggle',
+  -- },
   {
-    'voldikss/vim-floaterm',
+    'nvzone/floaterm',
+    dependencies = 'nvzone/volt',
+    opts = {
+      border = true,
+      size = { h = 90, w = 90 },
+    },
     cmd = 'FloatermToggle',
   },
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
