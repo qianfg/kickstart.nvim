@@ -6,3 +6,5 @@ elseif vim.g['GuiLoaded'] then
 else
   vim.o.mouse = ''
 end
+vim.o.cursorcolumn = true
+vim.g.editorconfig = true
